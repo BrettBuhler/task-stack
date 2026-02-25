@@ -24,6 +24,7 @@ import {
 interface DateTimePickerProps {
   value: string;
   onChange: (isoString: string) => void;
+  ariaLabelledBy?: string;
 }
 
 function parseTimeString(raw: string): { hours: number; minutes: number } | null {
@@ -54,7 +55,7 @@ function parseTimeString(raw: string): { hours: number; minutes: number } | null
   return { hours, minutes };
 }
 
-export default function DateTimePicker({ value, onChange }: DateTimePickerProps) {
+export default function DateTimePicker({ value, onChange, ariaLabelledBy }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -198,6 +199,7 @@ export default function DateTimePicker({ value, onChange }: DateTimePickerProps)
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-labelledby={ariaLabelledBy}
         className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-all ${
           open
             ? 'border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.08)]'

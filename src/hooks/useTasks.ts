@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Task, CreateTaskInput, UpdateTaskInput } from '@/lib/types';
 
+function isMissingUserIdColumnError(error: { message?: string | null; details?: string | null }) {
+  const combined = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return combined.includes('user_id') && (combined.includes('column') || combined.includes('schema cache'));
+}
+
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +21,7 @@ export function useTasks() {
 
     if (error) {
       console.error('Error fetching tasks:', error);
+      setLoading(false);
       return;
     }
     setTasks(data || []);
@@ -29,15 +35,36 @@ export function useTasks() {
   const createTask = useCallback(
     async (input: CreateTaskInput) => {
       const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
       const maxOrder = tasks.reduce((max, t) => Math.max(max, t.sort_order), -1);
-      const { data, error } = await supabase
+      const baseInsert = { ...input, sort_order: maxOrder + 1 };
+      const insertWithUser = userId ? { ...baseInsert, user_id: userId } : baseInsert;
+
+      if (!userId) {
+        console.error('Warning creating task: missing authenticated user session');
+      }
+
+      let { data, error } = await supabase
         .from('tasks')
-        .insert({ ...input, sort_order: maxOrder + 1, user_id: session?.user?.id })
+        .insert(insertWithUser)
         .select('*, follow_ups(*)')
         .single();
 
+      if (error && userId && isMissingUserIdColumnError(error)) {
+        ({ data, error } = await supabase
+          .from('tasks')
+          .insert(baseInsert)
+          .select('*, follow_ups(*)')
+          .single());
+      }
+
       if (error) {
-        console.error('Error creating task:', error);
+        console.error('Error creating task:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
         return null;
       }
       setTasks((prev) => [...prev, data]);

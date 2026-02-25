@@ -8,6 +8,11 @@ import { toast } from 'sonner';
 
 const POLL_INTERVAL = 30_000; // 30 seconds
 
+function isMissingUserIdColumnError(error: { message?: string | null; details?: string | null }) {
+  const combined = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return combined.includes('user_id') && (combined.includes('column') || combined.includes('schema cache'));
+}
+
 export function useFollowUps(onFollowUpNotified?: () => void) {
   const [dueFollowUps, setDueFollowUps] = useState<FollowUp[]>([]);
 
@@ -62,14 +67,35 @@ export function useFollowUps(onFollowUpNotified?: () => void) {
 
   const createFollowUp = useCallback(async (input: CreateFollowUpInput) => {
     const { data: { session } } = await supabase.auth.getSession();
-    const { data, error } = await supabase
+    const userId = session?.user?.id;
+    const baseInsert = { ...input };
+    const insertWithUser = userId ? { ...baseInsert, user_id: userId } : baseInsert;
+
+    if (!userId) {
+      console.error('Warning creating follow-up: missing authenticated user session');
+    }
+
+    let { data, error } = await supabase
       .from('follow_ups')
-      .insert({ ...input, user_id: session?.user?.id })
+      .insert(insertWithUser)
       .select()
       .single();
 
+    if (error && userId && isMissingUserIdColumnError(error)) {
+      ({ data, error } = await supabase
+        .from('follow_ups')
+        .insert(baseInsert)
+        .select()
+        .single());
+    }
+
     if (error) {
-      console.error('Error creating follow-up:', error);
+      console.error('Error creating follow-up:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return null;
     }
     return data as FollowUp;

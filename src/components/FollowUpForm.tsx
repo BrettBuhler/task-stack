@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import DateTimePicker from './DateTimePicker';
 
 interface FollowUpFormProps {
@@ -12,6 +12,9 @@ interface FollowUpFormProps {
 export default function FollowUpForm({ taskId, onSubmit, onCancel }: FollowUpFormProps) {
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const titleInputId = useId();
+  const dueDateLabelId = useId();
+  const modalTitleId = useId();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +27,12 @@ export default function FollowUpForm({ taskId, onSubmit, onCancel }: FollowUpFor
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center animate-overlay-in bg-black/50 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center animate-overlay-in bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={modalTitleId}
+    >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
@@ -37,13 +45,14 @@ export default function FollowUpForm({ taskId, onSubmit, onCancel }: FollowUpFor
               <polyline points="12 6 12 12 16 14" />
             </svg>
           </div>
-          <h2 className="text-sm font-medium text-zinc-200">Add Follow-Up</h2>
+          <h2 id={modalTitleId} className="text-sm font-medium text-zinc-200">Add Follow-Up</h2>
         </div>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">Title</label>
+            <label htmlFor={titleInputId} className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">Title</label>
             <input
+              id={titleInputId}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -53,8 +62,8 @@ export default function FollowUpForm({ taskId, onSubmit, onCancel }: FollowUpFor
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">Due Date</label>
-            <DateTimePicker value={dueDate} onChange={setDueDate} />
+            <label id={dueDateLabelId} className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">Due Date</label>
+            <DateTimePicker value={dueDate} onChange={setDueDate} ariaLabelledBy={dueDateLabelId} />
           </div>
           <div className="flex items-center gap-2 pt-2">
             <button

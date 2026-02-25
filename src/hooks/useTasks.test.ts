@@ -55,6 +55,18 @@ describe('useTasks', () => {
     expect(result.current.tasks).toEqual(mockTasks);
   });
 
+  it('sets loading to false when initial fetch fails', async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: null, error: { message: 'fail' } })
+    );
+
+    const { result } = renderHook(() => useTasks());
+    expect(result.current.loading).toBe(true);
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.tasks).toEqual([]);
+  });
+
   it('createTask calculates sort_order from max existing', async () => {
     const newTask = { ...mockTasks[0], id: 'task-new', sort_order: 3 };
     let callCount = 0;
@@ -77,6 +89,59 @@ describe('useTasks', () => {
 
     // Verify from was called with 'tasks' for insert
     expect(mockFrom).toHaveBeenCalledWith('tasks');
+  });
+
+  it('createTask still inserts when no authenticated user session exists', async () => {
+    const newTask = { ...mockTasks[0], id: 'task-no-session', sort_order: 3 };
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return chainable({ data: mockTasks, error: null });
+      return chainable({ data: newTask, error: null });
+    });
+
+    mockGetSession.mockResolvedValue({
+      data: { session: null },
+    });
+
+    const { result } = renderHook(() => useTasks());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let created: unknown = null;
+    await act(async () => {
+      created = await result.current.createTask({ title: 'New Task' });
+    });
+
+    expect(created).toEqual(newTask);
+    expect(result.current.tasks[result.current.tasks.length - 1]?.id).toBe('task-no-session');
+  });
+
+  it('createTask retries without user_id when schema is missing that column', async () => {
+    const newTask = { ...mockTasks[0], id: 'task-retry', sort_order: 3 };
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return chainable({ data: mockTasks, error: null }); // initial fetch
+      if (callCount === 2) {
+        return chainable({
+          data: null,
+          error: {
+            message: 'Could not find the user_id column of tasks in the schema cache',
+            details: null,
+          },
+        });
+      }
+      return chainable({ data: newTask, error: null });
+    });
+
+    const { result } = renderHook(() => useTasks());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.createTask({ title: 'Retry Task' });
+    });
+
+    expect(result.current.tasks[result.current.tasks.length - 1]?.id).toBe('task-retry');
   });
 
   it('updateTask replaces the task in state', async () => {

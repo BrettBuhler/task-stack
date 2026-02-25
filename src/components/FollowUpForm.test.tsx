@@ -5,12 +5,21 @@ import FollowUpForm from './FollowUpForm';
 
 // Mock DateTimePicker to simplify testing
 vi.mock('./DateTimePicker', () => ({
-  default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+  default: ({
+    value,
+    onChange,
+    ariaLabelledBy,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    ariaLabelledBy?: string;
+  }) => (
     <input
       data-testid="date-picker"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder="Pick date & time..."
+      aria-labelledby={ariaLabelledBy}
     />
   ),
 }));
@@ -32,7 +41,7 @@ describe('FollowUpForm', () => {
 
   it('disables submit when title or due date is missing', () => {
     render(<FollowUpForm taskId="task-1" onSubmit={vi.fn()} onCancel={vi.fn()} />);
-    expect(screen.getByText('Add Follow-Up')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add Follow-Up' })).toBeDisabled();
   });
 
   it('calls onSubmit with correct data', async () => {
@@ -42,7 +51,7 @@ describe('FollowUpForm', () => {
 
     await user.type(screen.getByPlaceholderText('Follow-up title...'), 'Check back');
     await user.type(screen.getByTestId('date-picker'), '2025-12-01T09:00:00.000Z');
-    await user.click(screen.getByText('Add Follow-Up'));
+    await user.click(screen.getByRole('button', { name: 'Add Follow-Up' }));
 
     expect(onSubmit).toHaveBeenCalledWith({
       task_id: 'task-1',
